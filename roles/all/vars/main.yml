@@ -2,4 +2,3 @@
 apache_port: 8888
 site_folder: /var/www/html
 folder_apache: /etc/apache2
-gpg_key_url: https://packages.sury.org/php/apt.gpg
