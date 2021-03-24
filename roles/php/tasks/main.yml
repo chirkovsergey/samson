@@ -1,0 +1,22 @@
+---
+ - name: Install php 7.2
+   apt:
+     name: [php7.2,php7.2-fpm,libapache2-mod-php7.2]
+     state: present
+     update_cache: True
+   notify:
+     - restart apache
+
+ - name: Toggle libapache2-mod-php5.6 to 7.2
+   shell: a2dismod php5.6 ; sudo a2enmod php7.2
+   args:
+      executable: /bin/bash
+      
+ - name: Remove php5.6 package
+   apt:
+     name: [php5.6,php5.6-fpm,libapache2-mod-php5.6]
+     state: absent
+
+ - name: Remove dependencies 
+   apt:
+     autoremove: yes

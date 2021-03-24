@@ -1,0 +1,113 @@
+---
+ - name: Install python for Ansible
+   raw: test -e /usr/bin/python || (apt -y update && apt install -y python-minimal)
+   changed_when: False
+
+ - name: Install all the packages
+   apt:
+     name: [vim,wget,htop,tmux,lsb-release,apt-transport-https,ca-certificates]
+     state: present
+     update_cache: True
+
+ - name: Add GPG key deb.sury.org repository
+   get_url:
+     url: https://packages.sury.org/php/apt.gpg
+     dest: /etc/apt/trusted.gpg.d/php71-sury.gpg
+     mode: "0644"
+ 
+ - name: Run command if /path/to/database does not exist (with 'args' keyword).
+   raw: echo "deb https://packages.sury.org/php/ $(lsb_release -sc) main" > /etc/apt/sources.list.d/php.list
+   args:
+     executable: /bin/bash
+   
+ - name: Check if php already installed
+   shell: dpkg-query -W php
+   register: check_php
+   ignore_errors: True
+       
+ - name: Install php
+   apt:
+     name: [php5.6,php5.6-fpm,libapache2-mod-php5.6]
+     state: present
+     update_cache: True
+   when: 
+     - check_php.rc != 0
+ 
+ - name: Install apache
+   apt:
+     name: apache2
+     state: present
+     update_cache: True
+
+
+ - name: Apache modif listen port 
+   lineinfile: 
+     dest: '{{ folder_apache }}/ports.conf' 
+     regexp: "^Listen 80" 
+     line: "Listen {{ apache_port }}" 
+     state: present
+     
+ - name: Remove config default websites
+   file:
+     path: '{{ folder_apache }}/sites-enabled/000-default.conf'
+     state: absent
+
+ - name: Create config websites
+   template:
+     src: "{{ item }}"
+     dest: '{{ folder_apache }}/sites-enabled/site.conf'
+   with_items:
+     - site.conf.j2
+
+ - name: Remove default websites
+   file:
+     path: '{{ site_folder }}/index.html'
+     state: absent
+   
+ - name: Copy website
+   template:
+     src: "{{ item.src }}"
+     dest: "{{ item.dest }}"
+   with_items:
+     - { src: 'test.php.j2', dest: '{{ site_folder }}/index.php'}
+     - { src: 'info.php.j2', dest: '{{ site_folder }}/info.php'} 
+   notify:
+     - nginx restart
+     - apache restart
+     
+ - name: Apache started
+   service:
+     name: apache2
+     state: restarted
+
+
+ - name: Install Nginx
+   yum: name=nginx state=latest
+   notify:
+     - nginx start
+
+ - name: Remove default nginx config
+   file:
+    name: /etc/nginx/sites-enabled/default
+    state: absent
+
+
+ - name: Add NGINX cofig
+   template:
+    src: "{{ item.src }}"
+    dest: "{{ item.dest }}"
+   with_items:
+     - { src: 'default.j2', dest: '/etc/nginx/sites-available/site' }
+   notify:
+    -  nginx restart
+
+ - name: Create simlink
+   file:
+    src: "{{ item.src }}"
+    dest: "{{ item.dest }}"
+    state: link
+    force: yes
+   with_items:
+    - { src: '/etc/nginx/sites-available/site', dest: '/etc/nginx/sites-enabled/site'}
+   notify:
+    - nginx restart
